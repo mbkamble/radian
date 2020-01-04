@@ -440,18 +440,18 @@ Otherwise, Emacs will just get slower and slower over time."
 
 ;; Feature `gnutls' provides support for SSL/TLS connections, using
 ;; the GnuTLS library.
-(with-eval-after-load 'gnutls
-
-  ;; `use-package' does this for us normally.
-  (eval-when-compile
-    (require 'gnutls))
-
-  ;; Do not allow insecure TLS connections.
-  (setq gnutls-verify-error t)
-
-  ;; Bump the required security level for TLS to an acceptably modern
-  ;; value.
-  (setq gnutls-min-prime-bits 3072))
+;;mbk (with-eval-after-load 'gnutls
+;;mbk
+;;mbk   ;; `use-package' does this for us normally.
+;;mbk   (eval-when-compile
+;;mbk     (require 'gnutls))
+;;mbk
+;;mbk   ;; Do not allow insecure TLS connections.
+;;mbk   (setq gnutls-verify-error t)
+;;mbk
+;;mbk   ;; Bump the required security level for TLS to an acceptably modern
+;;mbk   ;; value.
+;;mbk   (setq gnutls-min-prime-bits 3072))
 
 ;; Feature `url-http' is a library for making HTTP requests.
 (with-eval-after-load 'url-http
@@ -494,6 +494,20 @@ binding the variable dynamically over the entire init-file."
 
 (setq straight-current-profile 'radian)
 
+;; Treat loading the init-file as a transaction. See the straight.el
+;; documentation for more information about this.
+
+(radian-defhook radian--finalize-straight-transaction ()
+  radian--finalize-init-hook
+  "Finalize the init-file's straight.el transaction."
+  (setq straight-treat-as-init nil)
+  ;; Just in case the straight.el bootstrap failed, do not mask the
+  ;; error with a void-function error.
+  (when (fboundp 'straight-finalize-transaction)
+    (straight-finalize-transaction)))
+
+(setq straight-treat-as-init t)
+
 ;; Use the develop branch of straight.el on Radian's develop branch.
 ;; (On Radian's master branch, we use the master branch of
 ;; straight.el.)
@@ -501,7 +515,9 @@ binding the variable dynamically over the entire init-file."
 
 ;; If watchexec and Python are installed, use file watchers to detect
 ;; package modifications. This saves time at startup. Otherwise, use
-;; the ever-reliable find(1).
+;; the less robust but equally fast `before-save-hook' modification
+;; checker. In both cases, allow using find(1) when explicitly
+;; requested.
 (if (and (executable-find "watchexec")
          (executable-find "python3"))
     (setq straight-check-for-modifications '(watch-files find-when-checking))
@@ -685,7 +701,7 @@ KEY-NAME, COMMAND, and PREDICATE are as in `bind-key'."
 (defun radian-env-setup (&optional again)
   "Load ~/.profile and set environment variables exported therein.
 Only do this once, unless AGAIN is non-nil."
-  (interactive (list 'again))
+  (interactive)
   ;; No need to worry about race conditions because Elisp isn't
   ;; concurrent (yet).
   (unless (and radian--env-setup-p (not again))
@@ -702,9 +718,9 @@ Only do this once, unless AGAIN is non-nil."
           (let* ((python-script
                   (expand-file-name "scripts/print_env.py" radian-directory))
                  (delimiter (radian--random-string))
-                 (sh-script (format ". %s && %s %s"
-                                    (shell-quote-argument
-                                     (expand-file-name profile-file))
+                 (sh-script (format "%s %s"
+                                    ;;mbk (shell-quote-argument
+                                    ;;mbk  (expand-file-name profile-file))
                                     (shell-quote-argument python-script)
                                     (shell-quote-argument delimiter)))
                  (return (call-process "sh" nil t nil "-c" sh-script))
@@ -1278,24 +1294,12 @@ unquote it using a comma."
          (defun-form `(defun ,defun-name ()
                         ,docstring
                         (interactive)
-                        (when (or (file-exists-p ,full-filename)
-                                  (yes-or-no-p
-                                   ,(format
-                                     "Does not exist, really visit %s? "
-                                     (file-name-nondirectory
-                                      full-filename))))
-                          (find-file ,full-filename))))
+                        (find-file ,full-filename)))
          (defun-other-window-form
            `(defun ,defun-other-window-name ()
               ,docstring-other-window
               (interactive)
-              (when (or (file-exists-p ,full-filename)
-                        (yes-or-no-p
-                         ,(format
-                           "Does not exist, really visit %s? "
-                           (file-name-nondirectory
-                            full-filename))))
-                (find-file-other-window ,full-filename))))
+              (find-file-other-window ,full-filename)))
          (full-keybinding
           (when keybinding
             (radian-join-keys "e" keybinding)))
@@ -1626,14 +1630,6 @@ invocation will kill the newline."
 
 ;;;; Undo/redo
 
-;; Feature `warnings' allows us to enable and disable warnings.
-(use-feature warnings
-  :config
-
-  ;; Ignore the warning we get when a huge buffer is reverted and the
-  ;; undo information is too large to be recorded.
-  (add-to-list 'warning-suppress-log-types '(undo discard-info)))
-
 ;; Package `undo-tree' replaces the default Emacs undo system, which
 ;; is poorly designed and hard to use, with a much more powerful
 ;; tree-based system. In basic usage, you don't even have to think
@@ -1789,10 +1785,6 @@ the reverse direction from \\[pop-global-mark]."
 
 ;;; Electricity: automatic things
 ;;;; Autorevert
-
-;; On macOS, Emacs has a nice keybinding to revert the current buffer.
-;; On other platforms such a binding is missing; we re-add it here.
-(bind-key "s-u" #'revert-buffer)
 
 ;; Feature `autorevert' allows the use of file-watchers or polling in
 ;; order to detect when the file visited by a buffer has changed, and
@@ -2121,7 +2113,6 @@ set LSP configuration (see `lsp-python-ms')."
                    #'ruby-mode
                    #'rust-mode))
         (lsp))))
-
   :config
 
   (defun radian--advice-lsp-mode-silence (format &rest args)
@@ -2200,7 +2191,6 @@ killed (which happens during Emacs shutdown)."
   ;; We want to make sure the PATH is set up correctly by now, since
   ;; otherwise we might not be able to find the LSP server binaries.
   (radian-env-setup))
-
 ;;;; Indentation
 
 ;; Don't use tabs for indentation. Use only spaces. Otherwise,
@@ -2797,7 +2787,7 @@ nor requires Flycheck to be loaded."
 ;; Feature `cider-doc' from package `cider' handles rendering Clojure
 ;; function and variable docstrings, etc.
 (use-feature cider-doc
-  :init
+ :init
 
   ;; Here we deal with a really weird and dumb bug
   ;; <https://github.com/raxod502/radian/issues/446>. The problem is
@@ -2979,7 +2969,6 @@ This works around an upstream bug; see
              (makefile-makepp-mode . "Makefile")
              (makefile-bsdmake-mode . "Makefile")
              (makefile-imake-mode . "Makefile")))
-
 ;;;; Markdown
 ;; https://daringfireball.net/projects/markdown/
 
@@ -3474,7 +3463,7 @@ environment with point at the end of a non-empty line of text."
 ;; Package `lsp-latex' provides an `lsp-mode' client for LaTeX.
 (use-package lsp-latex
   :straight (:host github :repo "ROCKTAKEY/lsp-latex")
-  :demand t
+ :demand t
   :after (:all lsp-clients tex))
 
 ;;;; VimScript
@@ -3659,33 +3648,7 @@ This function calls `json-mode--update-auto-mode' to change the
 
   (defvar json-mode--auto-mode-entry
     (json-mode--update-auto-mode json-mode-auto-mode-list)
-    "Regexp generated from the `json-mode-auto-mode-list'.")
-
-  :config
-
-  (radian-defhook radian--fix-json-indentation ()
-    json-mode-hook
-    "Set the tab width to 2 for JSON."
-    (setq-local tab-width 2))
-
-  (use-feature flycheck
-    :config
-
-    ;; Handle an error message that occurs when the buffer has only
-    ;; whitespace, and in some other circumstances, which for some
-    ;; bizarre reason still isn't handled correctly by Flycheck.
-    (radian-protect-macros
-      (cl-pushnew
-       (cons
-        (flycheck-rx-to-string
-         `(and
-           line-start
-           (message "No JSON object could be decoded")
-           line-end)
-         'no-group)
-        'error)
-       (flycheck-checker-get 'json-python-json 'error-patterns)
-       :test #'equal))))
+    "Regexp generated from the `json-mode-auto-mode-list'."))
 
 ;; Package `pip-requirements' provides a major mode for
 ;; requirements.txt files used by Pip.
@@ -3915,7 +3878,8 @@ to `radian-reload-init'."
         (setq name (buffer-name)))
       (let ((load-file-name (buffer-file-name)))
         (message "Evaluating %s..." name)
-        (eval-region start end)
+        (straight-transaction
+          (eval-region start end))
         (message "Evaluating %s...done" name)))))
 
 ;; This keybinding is used for evaluating a buffer of Clojure code in
@@ -4295,6 +4259,10 @@ non-nil value to enable trashing for file operations."
   (osx-trash-setup))
 
 ;;;;; Dired
+
+;; For some reason, the autoloads from `dired-aux' and `dired-x' are
+;; not loaded automatically. Do it.
+(require 'dired-loaddefs)
 
 ;; Dired has some trouble parsing out filenames that have e.g. leading
 ;; spaces, unless the ls program used has support for Dired. GNU ls
@@ -5223,7 +5191,7 @@ an effect for Emacs 26 or below."
 
 (setq minibuffer-message-properties '(face minibuffer-prompt))
 
-;; Disable the contextual menu that pops up when you right-click.
+ ; Disable the contextual menu that pops up when you right-click.
 (unbind-key "<C-down-mouse-1>")
 
 ;; The menu bar appears in both graphical and tty frames. Kill it.
