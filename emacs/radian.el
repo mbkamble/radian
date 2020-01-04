@@ -2454,6 +2454,7 @@ order."
   :demand t
   :config
 
+  (ignore '  ;; begin snipout code segment S1
   (radian-when-compiletime (version<= "27" emacs-version)
     (el-patch-defun eldoc-print-current-symbol-info ()
       (el-patch-concat
@@ -2492,6 +2493,7 @@ order."
                      (setq eldoc-last-message nil))
                    nil))
              (eldoc-message (funcall eldoc-documentation-function))))))
+  ) ;; end snipout S1
 
   (radian-when-compiletime (version< emacs-version "26")
     (el-patch-defun eldoc-print-current-symbol-info ()
@@ -4050,6 +4052,7 @@ messages."
 ;; interacting with this data, including an agenda view, a time
 ;; clocker, etc. There are *many* extensions.
 (use-feature org
+  :straight (:files (:defaults "contrib/lisp/*.el") :local-repo "org")
   :bind (:map org-mode-map
 
               ;; Prevent Org from overriding the bindings for

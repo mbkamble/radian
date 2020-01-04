@@ -30,7 +30,7 @@
                   (pcase elem
                     (`(:propertize (,_ minor-mode-alist . ,_) . ,_)
                      "")
-                    (t elem)))
+                    (_ elem)))
                 mode-line-modes))
 
 
@@ -72,6 +72,8 @@
              "z+" #'text-scale-adjust)
     (:states '(insert)
              "C-e" #'end-of-line
+             "C-k" #'kill-line
+             (kbd "M-g r") #'evil-insert-digraph
              "C-a" #'evil-first-non-blank-of-visual-line)
     :config
     (progn
@@ -125,8 +127,8 @@
     (evil-escape-mode)
     (setq evil-escape-lighter nil)
     :config
-    (setq-default evil-escape-key-sequence "tn")
-    (setq-default evil-escape-undordered-key-sequence t)
+    (setq-default evil-escape-key-sequence "kt") ; alternatives: "mj", 'qn'
+    (setq-default evil-escape-unordered-key-sequence t)
     )
 
   (use-package evil-text-object-python
@@ -164,7 +166,7 @@
                      :fork (:repo "mbkamble/evil-collection"))
     :after evil
     :defer 1
-    :custom (evil-collection-setup-minibuffer t)
+    :custom (evil-collection-outline-bind-tab-p t) ;; enable tab-based bindings in outline mode
     :init (evil-collection-init)
     ;; (message "evil-collection-init executed")
     ;;mbk (setq evil-collection-mode-list t)
@@ -229,10 +231,12 @@
     (setq avy-timeout-seconds 0.35)
     (setq avy-background t))
 
-  (use-package ivy-xref
-    :init (if (< emacs-major-version 27)
-              (setq xref-show-xrefs-function #'ivy-xref-show-xrefs)
-            (setq xref-show-definitions-function #'ivy-xref-show-defs)))
+  (ignore '
+   (use-package ivy-xref
+     :init (if (< emacs-major-version 27)
+               (setq xref-show-xrefs-function #'ivy-xref-show-xrefs)
+             (setq xref-show-definitions-function #'ivy-xref-show-defs)))
+   )
 
   (use-package dired-hacks-utils)
   (use-package dired-filter
@@ -294,9 +298,9 @@
     "bK" 'crux-kill-other-buffers
     "bl" 'display-line-numbers-mode
     ;;"bN" 'cpm/new-buffer-new-frame
-    "bo" 'ivy-switch-buffer-other-window
+    ;; "bo" 'ivy-switch-buffer-other-window
     "br" 'revert-buffer
-    "bs" 'counsel-switch-buffer
+    ;; "bs" 'counsel-switch-buffer
     "bR" 'crux-rename-buffer-and-file
     "bt" 'open-dir-in-iterm
     )
@@ -305,11 +309,11 @@
     :keymaps 'override
 
     "f"  '(:ignore t :which-key "Files")
-    "ff" 'counsel-find-files
-    "fl" 'counsel-locate
+    ;; "ff" 'counsel-find-files
+    ;; "fl" 'counsel-locate
     "fo" 'crux-open-with
     "fs" 'save-buffer
-    "fr" 'counsel-recentf
+    ;; "fr" 'counsel-recentf
     "fy" '(cpm/show-and-copy-buffer-filename :which-key "show/copy")
     )
 
@@ -342,6 +346,10 @@
   ;;mbk     "gl" 'outline-next-visible-heading ;; also on ']]' (evil-collection-outline)
   ;;mbk     "gu" 'outline-previous-visible-heading ;; also on '[[' (evil-collection-outline)
   ;;mbk     )
+  (require 'ox-confluence)
+  (recentf-mode 1)
+  (run-at-time nil (* 5 60) 'recentf-save-list)
+
   (custom-set-variables
    ;; custom-set-variables was added by Custom.
    ;; If you edit it by hand, you could mess it up, so be careful.
